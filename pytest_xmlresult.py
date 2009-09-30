@@ -57,29 +57,14 @@ class XMLResult(object):
     failure_count = 0
     skip_count = 0
     
-    class _StringStream:
-        def __init__(self):
-            self.reset()
-            return
-    
-        def write(self, string):
-            self._string += string
-            return
-            
-        def read(self):
-            return self._string
-            
-        def reset(self):
-            self._string = ""
-    
     def __init__(self, logfile):
         self.logfile = logfile
-        self.test_logs = self._StringStream()
+        self.test_logs = []
     
     def write_log_entry(self, testpath, shortrepr, longrepr):
         self.test_count += 1
         # Create an xml log entry for the tests
-        self.test_logs.write('<testcase test_method="%s" name="%s" time="%.3f">' % (testpath.split(':')[-1], testpath, self.test_taken_time))
+        self.test_logs.append('<testcase test_method="%s" name="%s" time="%.3f">' % (testpath.split(':')[-1], testpath, self.test_taken_time))
         
         # Do we have any other data to capture for Errors, Fails and Skips
         if shortrepr in ['E', 'F', 'S']:
@@ -92,17 +77,16 @@ class XMLResult(object):
                 self.skip_count += 1
             
             tag_map = {'E': 'error', 'F': 'failure', 'S': 'skipped'}
-            self.test_logs.write("<%s>" % tag_map[shortrepr])
+            self.test_logs.append("<%s>" % tag_map[shortrepr])
             
             # Output any more information
             for line in longrepr.splitlines():
-                self.test_logs.write("<![CDATA[%s\n]]>" % line)
-            self.test_logs.write("</%s>" % tag_map[shortrepr])
-        self.test_logs.write("</testcase>")
+                self.test_logs.append("<![CDATA[%s\n]]>" % line)
+            self.test_logs.append("</%s>" % tag_map[shortrepr])
+        self.test_logs.append("</testcase>")
 
     def log_outcome(self, node, shortrepr, longrepr):
-        testpath = generic_path(node)
-        self.write_log_entry(testpath, shortrepr, longrepr)
+        self.write_log_entry(node.name, shortrepr, longrepr)
 
     def pytest_runtest_logreport(self, report):
         code = report.shortrepr 
@@ -155,7 +139,7 @@ class XMLResult(object):
         self.logfile.write('tests="%i" ' % self.test_count)
         self.logfile.write('time="%.3f"' % suite_time_delta)
         self.logfile.write(' >')
-        self.logfile.write(self.test_logs.read())
+        self.logfile.writelines(self.test_logs)
         self.logfile.write('</testsuite>')
         self.logfile.close()
 
@@ -174,7 +158,6 @@ def test_generic(testdir, LineMatcher):
     """)
     testdir.runpytest("--xmlresult=result.xml")
     lines = testdir.tmpdir.join("result.xml").readlines(cr=0)
-    print lines
     LineMatcher(lines).fnmatch_lines([
         '*testsuite errors="0" failures="1" skips="1" name="" tests="3"*'
     ])
@@ -192,7 +175,6 @@ def test_generic_path():
     p2 = Node('B', parent=p1)
     p3 = Node('()', parent = p2)
     item = Item('c', parent = p3)
-
     res = generic_path(item)
     assert res == 'a.B().c'
 
