@@ -1,0 +1,12 @@
+===============
+py.test plugins
+===============
+
+Some plugins to share:
+
+* pytest_coverage
+  Uses the coverage library to measure code metrics.
+  The html report for coverage is especially nice.
+
+* pytest_xmlresult
+  Provides xml results for your tests - so you can use it with cruisecontrol
